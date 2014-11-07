@@ -1,0 +1,2 @@
+defmodule EStateBox do
+end
