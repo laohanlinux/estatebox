@@ -64,7 +64,7 @@ defmodule EStateBox do
   def expire(age, state = %StateBox{queue: q, last_modified: t}) do
     oldt = t - age
     q = q |> Enum.filter(fn({eventt, _}) -> eventt < oldt end)
-    %StateBox{queue: q} = state
+    %{state | queue: q}
   end
 
   @doc """
@@ -76,7 +76,7 @@ defmodule EStateBox do
   def truncate(n, state = %StateBox{queue: q}) do
     case :erlang.length(q) -n do
       tail when tail >0 ->
-        %StateBox{queue: :lists.nthtail(tail, q)} = state
+        %{state | queue: :lists.nthtail(tail, q)}
       _ ->
         state
     end
@@ -89,7 +89,46 @@ defmodule EStateBox do
   @spec merge([StateBox]) :: StateBox
   def merge([state]), do: state
   def merge(unordered) do
-
+    %StateBox{value: v, last_modified: t} = newest(unordered)
   end
 
+  @doc """
+  Apply an op() to data
+  op :: func, arguments
+  """
+  @spec apply_op(term, term) :: term
+  def apply_op({f, [a]}, data) when is_function(f, 2), do: f(a, data)
+  def apply_op({f, [a, b]}, data) when is_function(f, 3), do: f(a, b, data)
+  def apply_op({f, [a, b, c], data}) when is_function(f, 4), do: f(a, b, c data)
+  ##
+  def apply_op({f, a}, data) when is_function(f), do: :erlang.apply(f, a ++ [ data ])
+
+  def apply_op({m, f, [a]}, data), do: m.f(a, data)
+  def apply_op({m, f, [a, b]}, data), do: m.f(a, b, data)
+
+  def apply_op({m, f, a}, data), do: :erlang.apply(m ,f, a ++ [data])
+
+  def apply_op([op | rest], data), do: apply_op(rest, apply_op(op, data))
+
+  def apply_op([], data), do: data
+  ## Internal API
+  defp newest([first | rest]) do
+
+  end
+  defp newest(m0, [m1 | rest]) do
+    case last_modified(m0) >= last_modified(m1) do
+      true ->
+        newest(m0, rest)
+      false ->
+        newest(m1, rest)
+    end
+  end
+  defp newest(m, []), do: m
+  ## Return a new StateBox
+  defp new(t, v, q), do: %StateBox{value: v, queue: q, last_modified: t}
+  ## Push a new into event queue
+  defp queue_in(event, queue), do: queue ++ [event]
+
+  defp apply_queue(data, [{_t, op} | rest]), do: apply_queue(apply_queue(apply_op(op, data)))
+  defp apply_queue(data), do: data
 end
