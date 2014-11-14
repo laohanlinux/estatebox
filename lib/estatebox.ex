@@ -19,7 +19,7 @@ defmodule EStateBox do
     value: nil,
     ##  sorted list of operations (oldest first)
     queue: [],
-    last_modified: EStateBox.timestamp]
+    last_modified: EStateBox.Clock.timestamp()]
   end
 
   @doc """
@@ -34,15 +34,15 @@ defmodule EStateBox do
       return an "empty" object of the desired type, such as
       <code>fun gb_trees:empty/0</code>.
   """
-  @spec new(fun(() :: term())) :: StateBox
+  #@spec new((() :: term())) :: StateBox
   def new(constructor), do: new(EStateBox.Clock.timestamp(), constructor)
   @doc """
   Construct a statebox at statebox_clock.timestamp,
   containing the result of Constructor().
   This should return an "empty" object if the desired type, such as fun fun gb_trees:empty/0
   """
-  @spec new(fun(() :: term()))  :: StateBox
-  def new(t, constructor), do: new(t, constructor(), [])
+  #@spec new((() :: term()))  :: StateBox
+  def new(t, constructor), do: new(t, constructor.(), [])
 
   @doc """
   Return the current value of the StateBox. You Should consider this value to be read-only
@@ -53,7 +53,7 @@ defmodule EStateBox do
   @doc"""
   Return the last modified timestamp of the StateBox
   """
-  @spec last_modified(StateBox) :: EStateBox.timestamp
+  @spec last_modified(StateBox) :: EStateBox.Clock.timestamp
   def last_modified(%StateBox{last_modified: t}), do: t
 
   @doc """
@@ -63,7 +63,7 @@ defmodule EStateBox do
   @spec expire(integer, StateBox) :: StateBox
   def expire(age, state = %StateBox{queue: q, last_modified: t}) do
     oldt = t - age
-    q = q |> Enum.filter(fn({eventt, _}) -> eventt < oldt end)
+    q = q |> Enum.filter(fn({eventt, _}) -> eventt >= oldt end)
     %{state | queue: q}
   end
 
@@ -90,32 +90,68 @@ defmodule EStateBox do
   def merge([state]), do: state
   def merge(unordered) do
     %StateBox{value: v, last_modified: t} = newest(unordered)
+    IO.puts "v: #{inspect v}"
+    queue = unordered |>
+      Enum.map(fn(%StateBox{queue: q}) -> q end) |>
+      :lists.umerge
+    new(t, apply_queue(v, queue), queue)
   end
+
+  @doc """
+  Modify the value in statebox and add {T, Op} to its event queue.
+  Op should be a <code>{M, F, Args}</code> or <code>{Fun, Args}</code>.
+  The value will be transformed as such:
+  <code>NewValue = apply(Fun, Args ++ [value(S)])</code>.
+  The operation should be repeatable and should return the same type as
+  <code>value(S)</code>. This means that this should hold true:
+  <code>Fun(Arg, S) =:= Fun(Arg, Fun(Arg, S))</code>.
+  An example of this kind of operation is <code>orddict:store/3</code>.
+  Only exported operations should be used in order to ensure that the
+  serialization is small and robust (this is not enforced).
+  """
+  @spec modify(EStateBox.Clock.timestamp, term, StateBox) :: StateBox
+  def modify(t, op, %StateBox{value: value, queue: queue, last_modified: oldt}) when oldt <= t do
+    new(t, apply_op(op, value), queue_in({t, op}, queue))
+  end
+  def modify(t, op, %StateBox{last_modified: oldt}), do: throw({:invalid_timestamp, {t, '<',  oldt}})
+
+  @doc """
+  Modify a statebox at timestamp
+    max(1 + last_modified(s)), EStateBox.Clock.timestamp());
+    see modify/3 for more information
+    modify(max(1 + last_modified(s), EStateBox.Clock.timestamp()), op, s)
+  """
+  @spec modify(term, StateBox) :: StateBox
+  def modify(op, s), do: modify(max(1 + last_modified(s), EStateBox.Clock.timestamp()), op, s)
 
   @doc """
   Apply an op() to data
   op :: func, arguments
+  this is a key/value structure
   """
   @spec apply_op(term, term) :: term
-  def apply_op({f, [a]}, data) when is_function(f, 2), do: f(a, data)
-  def apply_op({f, [a, b]}, data) when is_function(f, 3), do: f(a, b, data)
-  def apply_op({f, [a, b, c], data}) when is_function(f, 4), do: f(a, b, c data)
+  def apply_op({f, [a]}, data) when is_function(f, 2), do: f.(a, data)
+  def apply_op({f, [a, b]}, data) when is_function(f, 3), do: f.(a, b, data)
+  def apply_op({f, [a, b, c]}, data) when is_function(f, 4), do: f.(a, b, c, data)
   ##
-  def apply_op({f, a}, data) when is_function(f), do: :erlang.apply(f, a ++ [ data ])
+  def apply_op({f, a}, data) when is_function(f), do: apply(f, a ++ [ data ])
 
-  def apply_op({m, f, [a]}, data), do: m.f(a, data)
-  def apply_op({m, f, [a, b]}, data), do: m.f(a, b, data)
+  def apply_op({m, f, [a]}, data), do: apply(m, f, [a, data])
+  def apply_op({m, f, [a, b]}, data), do: apply(m, f, [a, b, data])
 
-  def apply_op({m, f, a}, data), do: :erlang.apply(m ,f, a ++ [data])
+  def apply_op({m, f, a}, data), do: apply(m ,f, a ++ [data])
 
+  ## it can been used on queue withoud timestamp, eg: [op(), op(), op()]
+  #really, it should be [event(), event()]
   def apply_op([op | rest], data), do: apply_op(rest, apply_op(op, data))
-
   def apply_op([], data), do: data
   ## Internal API
-  defp newest([first | rest]) do
 
-  end
+  @spec newest(list) :: EStateBox
+  defp newest([first | rest]), do: newest(first, rest)
   defp newest(m0, [m1 | rest]) do
+    IO.puts "m0: #{inspect m0}"
+    IO.puts "m1: #{inspect m1}"
     case last_modified(m0) >= last_modified(m1) do
       true ->
         newest(m0, rest)
@@ -125,10 +161,15 @@ defmodule EStateBox do
   end
   defp newest(m, []), do: m
   ## Return a new StateBox
-  defp new(t, v, q), do: %StateBox{value: v, queue: q, last_modified: t}
+  defp new(t, v, q) do
+    IO.puts "value: #{inspect v}"
+    %StateBox{value: v, queue: q, last_modified: t}
+  end
   ## Push a new into event queue
   defp queue_in(event, queue), do: queue ++ [event]
 
-  defp apply_queue(data, [{_t, op} | rest]), do: apply_queue(apply_queue(apply_op(op, data)))
-  defp apply_queue(data), do: data
+  ## operation on every event of queue
+  defp apply_queue(data, [{_t, op} | rest]), do: apply_queue(apply_op(op, data), rest)
+  defp apply_queue(data, []), do: data
+
 end
