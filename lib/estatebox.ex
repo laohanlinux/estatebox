@@ -90,10 +90,10 @@ defmodule EStateBox do
   def merge([state]), do: state
   def merge(unordered) do
     %StateBox{value: v, last_modified: t} = newest(unordered)
-    IO.puts "v: #{inspect v}"
     queue = unordered |>
       Enum.map(fn(%StateBox{queue: q}) -> q end) |>
       :lists.umerge
+    IO.puts "Merge Queue: #{inspect queue}"
     new(t, apply_queue(v, queue), queue)
   end
 
@@ -150,8 +150,6 @@ defmodule EStateBox do
   @spec newest(list) :: EStateBox
   defp newest([first | rest]), do: newest(first, rest)
   defp newest(m0, [m1 | rest]) do
-    IO.puts "m0: #{inspect m0}"
-    IO.puts "m1: #{inspect m1}"
     case last_modified(m0) >= last_modified(m1) do
       true ->
         newest(m0, rest)
