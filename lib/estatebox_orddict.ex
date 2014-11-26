@@ -18,64 +18,64 @@ defmodule EStateBox.Orddict do
     Enum.reduce(vals, [], fn(v, acc) -> as_statebox(v) end) |> EStateBox.merge
   end
 
-  @doc """
+  @doc"""
     Convert a proplist() to an orddict().
     Only [{term(), term()}] proplists are supported.
   """
   @spec orddict_from_proplist(proplist()) :: orddict()
   def orddict_from_proplist(p), do: :orddict.from_list(p)
 
-  @doc """
+  @doc"""
     Return true if the statebox's value is [], false otherwise
   """
   @spec is_empty(statebox()) :: boolean()
   def is_empty(box), do: EStateBox.value(box) == []
 
-  @doc """
+  @doc"""
     Returns an op() that does an ordsets:union(New, Set) on the value at
     K in orddict (or [] if not present).
   """
   @spec f_union(term(), [term()]) :: op()
   def f_union(k, new), do: {&__MODULE__.op_union/3, [k, new]}
 
-  @doc """
+  @doc"""
     Returns an op() that does an ordsets:subtract(Set, Del) on the value at
     K in orddict (or [] if not present).
   """
   @spec f_subtract(term(), [term()]) :: op()
   def f_subtract(k, del), do: {&__MODULE__.op_subtract/3, [k, del]}
 
-  @doc """
+  @doc"""
     Returns an op() that merges the proplist New to the orddict.
   """
   @spec f_merge_proplist(term()) :: op()
   def f_merge_proplist(new), do: f_merge(orddict_from_proplist(new))
 
-  @doc """
+  @doc"""
     Returns an op() that merges the orddict New to the orddict.
   """
   @spec f_merge(term()) :: op()
   def f_merge(new), do: {&__MODULE__.op_merge/2, [new]}
 
-  @doc """
+  @doc"""
     Returns an op() that updates the value at Key in orddict (or [] if
     not present) with the given Op.
   """
   @spec f_update(term(), op()) :: op()
   def f_update(key, op), do: {&__MODULE__.op_update/3, [key, op]}
 
-  @doc """
+  @doc"""
     Returns an op() that stores Value at Key in orddict.
   """
   @spec f_store(term(), term()) :: op()
   def f_store(key, value), do: {:orddict.store/3, [key, value]}
 
-  @doc """
+  @doc"""
     Returns an op() that deletes the pair if present from orddict.
   """
   @spec f_delete({term(), term()}) :: op()
   def f_delete(pair={_, _}), do: {:lists.delete/2, [pair]}
-  @doc """
+  @doc"""
     Returns an op() that erases the value at K in orddict.
   """
   @spec f_erase(term()) :: op()

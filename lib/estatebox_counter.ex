@@ -27,25 +27,25 @@ defmodule EStateBox.Counter do
   @type counter() :: [counter_op()]
 
   #计算counter 的值
-  @doc """
-  Return the value of the counter (the sum of all counter event deltas).
+  @doc"""
+    Return the value of the counter (the sum of all counter event deltas).
   """
   @spec value(counter) :: Integer
   def value([]), do: 0
   def value([{_key, v} | rest]), do: v + value(rest)
 
-  @doc """
-  Merge the given list of counters and return a new counter
-  with the union of that history.
+  @doc"""
+    Merge the given list of counters and return a new counter
+    with the union of that history.
   """
   @spec merge([counter]) :: counter
   def merge([counter]), do: counter
   def merge(counters), do: :orddict.from_list(merge_prune(counters))
 
-  @doc """
-  Accumulate all counter events older than Timestamp to
-  the key {timestamp, acc}, if there is already an ‘acc’
-  at or before timestamp this is a no_op.
+  @doc"""
+    Accumulate all counter events older than Timestamp to
+    the key {timestamp, acc}, if there is already an ‘acc’
+    at or before timestamp this is a no_op.
   """
   ## 累计timestamp之前的所有"counter events" , 然后把计算结果以 key{timestamp, :acc}的方式存放回去
   #如果已近存在:acc, 并且要计算的事件时间小于":acc"事件的时间，则直接返回，不用计算，
@@ -54,16 +54,16 @@ defmodule EStateBox.Counter do
   def accumulate(timestamp, counter = [{{t0, :acc}, _} | _]) when timestamp <= t0, do: counter
   def accumulate(timestamp, counter), do: accumulate(timestamp, counter, 0)
 
-  @doc """
-  Return a new counter with the given counter event, If there is an ":acc" at or before the
-  timestamp of the given key then this is a a no-op
+  @doc"""
+    Return a new counter with the given counter event, If there is an ":acc" at or before the
+    timestamp of the given key then this is a a no-op
   """
   @spec inc(counter_key, Integer, counter) ::  counter
   def inc({t1, _}, _, counter = [{{t0, :acc}, _} | _]) when t1 <= t0, do: counter
   def inc(key, value, counter), do: :orddict.store(key, value, counter)
 
-  @doc """
-  equive f_inc_acc(value, age, {EStateBox.CLock.timestamp, EStateBox.Identity.entropy})
+  @doc"""
+    equive f_inc_acc(value, age, {EStateBox.CLock.timestamp, EStateBox.Identity.entropy})
   """
   @spec f_inc_acc(Integer, timedelta) :: op
   def f_inc_acc(value, age) do
@@ -71,13 +71,13 @@ defmodule EStateBox.Counter do
     f_inc_acc(value, age, key)
   end
 
-  @doc """
-  Retuen a "StateBox Event" to increment and accumulate the counter .
-  "value" is the delta,
-  "age" is the maximum age of counter events in milliseconds
-  (this should be longer than the amount of time you expect your cluster to
-  reach a consistent state),
-  "key" is the counter event key
+  @doc"""
+    Retuen a "StateBox Event" to increment and accumulate the counter .
+    "value" is the delta,
+    "age" is the maximum age of counter events in milliseconds
+    (this should be longer than the amount of time you expect your cluster to
+    reach a consistent state),
+    "key" is the counter event key
   """
   @spec f_inc_acc(Integer, timedelta, counter_key) :: op
   def f_inc_acc(value, age, key = {timestamp, _id}), do: {&__MODULE__.op_inc_acc/4, [timestamp - age, key, value]}

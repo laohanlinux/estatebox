@@ -1,10 +1,10 @@
 defmodule EStateBox do
   require EStateBox.Clock
-  @moduledoc """
-  A monad for wrapping a value with a ordered event queue such that values that have diverged in history can be merged automatically in a predictable manner.
-  In order to provide for an efficient serialization, old events can be expired with expire/2 and the event queue can be truncated to a specific maximum size with truncate/2.
-  The default representation for a timestamp is OS clock msecs, defined by <code>statebox_clock:timestamp/0</code>.
-  This is used by the convenience functions <code>new/1</code> and <code>modify/2</code>.
+  @moduledoc"""
+    A monad for wrapping a value with a ordered event queue such that values that have diverged in history can be merged automatically in a predictable manner.
+    In order to provide for an efficient serialization, old events can be expired with expire/2 and the event queue can be truncated to a specific maximum size with truncate/2.
+    The default representation for a timestamp is OS clock msecs, defined by <code>statebox_clock:timestamp/0</code>.
+    This is used by the convenience functions <code>new/1</code> and <code>modify/2</code>.
   """
   @opaque statebox() :: StateBox
   @type event() :: {timestamp(), op()}
@@ -22,43 +22,43 @@ defmodule EStateBox do
     last_modified: EStateBox.Clock.timestamp()]
   end
 
-  @doc """
-  Return true if the argument is a statebox, false otherwise
+  @doc"""
+    Return true if the argument is a statebox, false otherwise
   """
   def is_statebox(%StateBox{}), do: true
   def is_statebox(_), do: false
 
-  @doc """
-  Construct a statebox at <code>statebox_clock:timestamp()</code>
-      containing the result of <code>Constructor()</code>. This should
-      return an "empty" object of the desired type, such as
-      <code>fun gb_trees:empty/0</code>.
+  @doc"""
+    Construct a statebox at <code>statebox_clock:timestamp()</code>
+    containing the result of <code>Constructor()</code>. This should
+    return an "empty" object of the desired type, such as
+    <code>fun gb_trees:empty/0</code>.
   """
   #@spec new((() :: term())) :: StateBox
   def new(constructor), do: new(EStateBox.Clock.timestamp(), constructor)
-  @doc """
-  Construct a statebox at statebox_clock.timestamp,
-  containing the result of Constructor().
-  This should return an "empty" object if the desired type, such as fun fun gb_trees:empty/0
+  @doc"""
+    Construct a statebox at statebox_clock.timestamp,
+    containing the result of Constructor().
+    This should return an "empty" object if the desired type, such as fun fun gb_trees:empty/0
   """
   #@spec new((() :: term()))  :: StateBox
   def new(t, constructor), do: new(t, constructor.(), [])
 
-  @doc """
-  Return the current value of the StateBox. You Should consider this value to be read-only
+  @doc"""
+    Return the current value of the StateBox. You Should consider this value to be read-only
   """
   @spec value(StateBox) :: term()
   def value(%StateBox{value: value}), do: value
 
   @doc"""
-  Return the last modified timestamp of the StateBox
+    Return the last modified timestamp of the StateBox
   """
   @spec last_modified(StateBox) :: EStateBox.Clock.timestamp
   def last_modified(%StateBox{last_modified: t}), do: t
 
-  @doc """
-  Remove all events older than last_modified(s) - age from the event queue,
-  queue type is [event()], event is {timestamp, op()}
+  @doc"""
+    Remove all events older than last_modified(s) - age from the event queue,
+    queue type is [event()], event is {timestamp, op()}
   """
   @spec expire(integer, StateBox) :: StateBox
   def expire(age, state = %StateBox{queue: q, last_modified: t}) do
@@ -67,10 +67,10 @@ defmodule EStateBox do
     %{state | queue: q}
   end
 
-  @doc """
-  truncate the event queue to the newest N events
-  eg:
-  [1, 2 , 3, 4] --1--> [2, 3, 4]
+  @doc"""
+    truncate the event queue to the newest N events
+    eg:
+      [1, 2 , 3, 4] --1--> [2, 3, 4]
   """
   @spec truncate(integer, StateBox) :: StateBox
   def truncate(n, state = %StateBox{queue: q}) do
@@ -81,10 +81,11 @@ defmodule EStateBox do
         state
     end
   end
-  @doc """
-  Return a new statebox as the product of all in-order events appliedd to
-  the last modified statebox(). if two events occur at the same time, the
-  event that sorts lowest by value will be applied first.
+
+  @doc"""
+    Return a new statebox as the product of all in-order events appliedd to
+    the last modified statebox(). if two events occur at the same time, the
+    event that sorts lowest by value will be applied first.
   """
   @spec merge([StateBox]) :: StateBox
   def merge([state]), do: state
@@ -96,17 +97,17 @@ defmodule EStateBox do
     new(t, apply_queue(v, queue), queue)
   end
 
-  @doc """
-  Modify the value in statebox and add {T, Op} to its event queue.
-  Op should be a <code>{M, F, Args}</code> or <code>{Fun, Args}</code>.
-  The value will be transformed as such:
-  <code>NewValue = apply(Fun, Args ++ [value(S)])</code>.
-  The operation should be repeatable and should return the same type as
-  <code>value(S)</code>. This means that this should hold true:
-  <code>Fun(Arg, S) =:= Fun(Arg, Fun(Arg, S))</code>.
-  An example of this kind of operation is <code>orddict:store/3</code>.
-  Only exported operations should be used in order to ensure that the
-  serialization is small and robust (this is not enforced).
+  @doc"""
+    Modify the value in statebox and add {T, Op} to its event queue.
+    Op should be a <code>{M, F, Args}</code> or <code>{Fun, Args}</code>.
+    The value will be transformed as such:
+    <code>NewValue = apply(Fun, Args ++ [value(S)])</code>.
+    The operation should be repeatable and should return the same type as
+    <code>value(S)</code>. This means that this should hold true:
+    <code>Fun(Arg, S) =:= Fun(Arg, Fun(Arg, S))</code>.
+    An example of this kind of operation is <code>orddict:store/3</code>.
+    Only exported operations should be used in order to ensure that the
+    serialization is small and robust (this is not enforced).
   """
   @spec modify(EStateBox.Clock.timestamp, term, StateBox) :: StateBox
   def modify(t, op, %StateBox{value: value, queue: queue, last_modified: oldt}) when oldt <= t do
@@ -114,8 +115,8 @@ defmodule EStateBox do
   end
   def modify(t, _op, %StateBox{last_modified: oldt}), do: throw({:invalid_timestamp, {t, '<',  oldt}})
 
-  @doc """
-  Modify a statebox at timestamp
+  @doc"""
+     Modify a statebox at timestamp
     max(1 + last_modified(s)), EStateBox.Clock.timestamp());
     see modify/3 for more information
     modify(max(1 + last_modified(s), EStateBox.Clock.timestamp()), op, s)
@@ -123,10 +124,10 @@ defmodule EStateBox do
   @spec modify(term, StateBox) :: StateBox
   def modify(op, s), do: modify(max(1 + last_modified(s), EStateBox.Clock.timestamp()), op, s)
 
-  @doc """
-  Apply an op() to data
-  op :: func, arguments
-  this is a key/value structure
+  @doc"""
+    Apply an op() to data
+    op :: func, arguments
+    this is a key/value structure
   """
   @spec apply_op(term, term) :: term
   def apply_op({f, [a]}, data) when is_function(f, 2), do: f.(a, data)

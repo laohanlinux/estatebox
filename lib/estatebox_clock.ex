@@ -1,10 +1,10 @@
 defmodule EStateBox.Clock do
-  @moduledoc """
+  @moduledoc"""
    this is !!!!!!!!!!!
   """
   @vsn 0.1
 
-  @doc """
+  @doc"""
     Current UNIX epoch timestamp in integer milliseconds,
     Equivalient to <code> now_to_msec(os:timestam()) </code>
   """
@@ -14,7 +14,7 @@ defmodule EStateBox.Clock do
     now_to_msec(:os.timestamp())
   end
 
-  @doc """
+  @doc"""
     Converts given time of now(0 format to UNIX epoch timestamp in integer milliseconds)
   """
   @spec now_to_msec(tuple) :: (integer)
