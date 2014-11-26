@@ -8,22 +8,25 @@ estatebox 参照于statebox实现的，主要用来解决在分布式中的版�
 
 - 满足幂等性
 
-在`ＥstateBox`中：
+在`EStateBox`中：
+
 - An `op()` must be repeatable: `F(Arg, F(Arg, Value)) =:= F(Arg, Value)`
 - If the `{fun(), [term()]}` form is used, the `fun()` should be a reference to an exported function.
 - `F(Arg, Value)` should return the same type as Value.
+
 当然，在其他情况下可以不完全满足这些条件，可以参照一些`Riak`的`VClock`。
+
 ## Overview:
 
-`EStateBox`是一种数据结构，这种数据结构在`最终一致性`系统中，如`riak`，可以用一种确定的方法来解决并行冲突。`EstateBox`只是一个事件的集合，这种事件的集合会导致唯一一个结果，所以这些事件必须满足一定的条件，这些条件如上所示。和`Ｒiak ＶＣlock`比较相似，他们都保持每一个的`操作方法` 和 `操作数`。`EstateBox`适合存储二进制数据，因为它的状态信息`量`只有`true or false`；最适合的是`集合`数据类型，并且这些集合携带了一个`value`，比如`购物车`的场景。
+`EStateBox`是一种数据结构，这种数据结构在`最终一致性`系统中，如`riak`，可以用一种确定的方法来解决并行冲突。`EStateBox`只是一个事件的集合，这种事件的集合会导致唯一一个结果，所以这些事件必须满足一定的条件，这些条件如上所示。和`Ｒiak VClock`比较相似，他们都保持每一个的`操作方法` 和 `操作数`。
 
-## Ｓtatus:
+## Status:
 
 在`Ｍochi Ｍedia`平台中，已经使用在多后端服务。
 
 ## Ｔheory
 
-`EStateBox` 包含一个当前值和一个事件队列，时间队列是一个按`{timestamp(), op()}`排列的有序列表。当有2个或者更多的`EStateBox`被`EStateBox.merge/1`合并，时间队列被`lists.umerge/1`合并，`操作`被执行于更新当前最新的`EStatBox`时, 将会产生一个新的`EStateBox`.
+`EStateBox` 包含一个当前值和一个事件队列，事件队列是一个按`{timestamp(), op()}`排列的有序列表。当有2个或者更多的`EStateBox`被`EStateBox.merge/1`合并，事件队列被`lists.umerge/1`合并，`操作`被执行于更新当前最新的`EStatBox`时, 将会产生一个新的`EStateBox`.
 
 - `op()`是一个`{fun(), [term()]}`的元组结构，除了最后一个参数，所有的参数都被指定在这个列表中。如：`{ordsets:add_element/2, [a]}`;
 
@@ -52,9 +55,9 @@ estatebox 参照于statebox实现的，主要用来解决在分布式中的版�
 - `{fun orddict:update_counter, [Key, Inc]}` , 因为`F(a, 1, [{a, 0}]) =/= F(a, 1 , F(a, 0}]))`, 可以看出不满足幂等性质。
 
 
-## Ｏptiomizations
+## Optiomizations
 
-为了防止`EStateBox`过大，浪费不必要的内存，这里有两个函数用来裁剪`Ｑeueu`的大小，分别是：
+为了防止`EStateBox`过大，浪费不必要的内存，这里有两个函数用来裁剪`Qeueu`的大小，分别是：
 
 - `truncate(n, stateBox)` 返回小于`n`个事件的队列
 
@@ -141,15 +144,15 @@ value: [c: :c, key: :b]
 
 ### f_inc_acc(value, age, key = {timestamp, _id})
 
-返回一个自增 或者 增加的`counter StateBox Event` 
+返回一个自增 或者 增加的`counter StateBox Event`
 ```
-value --> counter = into `inc(timestamp, key)` 
+value --> counter = into `inc(timestamp, key)`
     |
     |
- Age  --> accumute(Age, counter) 
+ Age  --> accumute(Age, counter)
 ```
 `@params`
-	
+
 ```shell
  value:  是一个delta,就是一个整数，便是本次叠加的value
  age：counter events的最大时间, 这个值和key中timestamp 一起用， 会被用在TA=（timestamp-Age）， TA之前的值会被计算
@@ -161,7 +164,7 @@ value --> counter = into `inc(timestamp, key)`
 **Test Case：**
 
 ```elxiir
-    test "f_inc_acc_test" do                                                                                                                                                                                 
+    test "f_inc_acc_test" do
     ¦ # we should expect to get unique enough results from our entropy and
     ¦ # timestamp even if the frequency is high.
     ¦ fincacc =  1..1000 |> enum.map(fn(_) -> estatebox.counter.f_inc_acc(1, 1000) end)
@@ -179,7 +182,7 @@ value --> counter = into `inc(timestamp, key)`
 ```elixir
   Return a new counter with the given counter event, If there is an ":acc" at or before the
   timestamp of the given key then this is a a no-op
- 
+
   @spec inc(counter_key, Integer, counter) ::  counter
   def inc({t1, _}, _, counter = [{{t0, :acc}, _} | _]) when t1 <= t0, do: counter
   def inc(key, value, counter), do: :orddict.store(key, value, counter)
@@ -188,7 +191,7 @@ value --> counter = into `inc(timestamp, key)`
 
 ```
 key ： counter 的id， 格式为{timestamp, counter_id} , counter_id = entropy|:acc， counter_id可以重复
-value : 操作数 
+value : 操作数
 counter：被操作的counter
 ```
 增加一个额外的`event counter` 到指定的`counter`中去。
@@ -200,7 +203,7 @@ counter：被操作的counter
    ¦ c0 = []
    ¦ c1 = EStateBox.Counter.inc({1, 1}, 1, c0)
    ¦ c2 = EStateBox.Counter.inc({2, 2}, 1, c1)
-     
+
    ¦ assert 0 === EStateBox.Counter.value(c0)
    ¦ assert 1 === EStateBox.Counter.value(c1)
    ¦ assert 2 === EStateBox.Counter.value(c2)
@@ -211,10 +214,10 @@ counter：被操作的counter
 
 ### merge([counter]) :: counter -> merge(counter) --> prune(counter) --> :listsumerge(counter)
 
-```elixir 
-   @doc """                                                          
-    Merge the given list of counters and return a new counter         
-    with the union of that history.                                   
+```elixir
+   @doc """
+    Merge the given list of counters and return a new counter
+    with the union of that history.
     """
 
    def merge([counter]), do: counter
@@ -230,19 +233,19 @@ counter：被操作的counter
 
 ```elixir
  test "merge test" do
-    ¦ c0 = [] 
+    ¦ c0 = []
     ¦ c1 = EStateBox.Counter.inc({1, 1}, 1, c0)
     ¦ c2 = EStateBox.Counter.inc({2, 2}, 1, c1)
-              
-    ¦ assert 2 === EStateBox.Counter.value(EStateBox.Counter.merge([c0, c1, c2]))                                                                                                                            
+
+    ¦ assert 2 === EStateBox.Counter.value(EStateBox.Counter.merge([c0, c1, c2]))
     ¦ assert 1 === EStateBox.Counter.value(EStateBox.Counter.merge([c0, c1, c1]))
     ¦ assert 1 === EStateBox.Counter.value(EStateBox.Counter.merge([c1]))
     ¦ assert 1 === EStateBox.Counter.value(EStateBox.Counter.merge([c0, c1]))
- end       
+ end
 ```
 
 
-- old counter test 
+- old counter test
 
 
 
