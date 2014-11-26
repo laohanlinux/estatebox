@@ -7,7 +7,7 @@ defmodule EStateBox.Identity do
   @doc"""
   equive entropy(node(), EStatebox.Clock.now())
   """
-  #@spec entropy() :: (tuple)
+  @spec entropy() :: (tuple)
   def entropy, do: entropy(:erlang.node(), EStateBox.Clock.now())
   def entropy(node, now), do: :erlang.phash2({node, now})
 

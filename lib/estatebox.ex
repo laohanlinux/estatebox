@@ -6,15 +6,15 @@ defmodule EStateBox do
   The default representation for a timestamp is OS clock msecs, defined by <code>statebox_clock:timestamp/0</code>.
   This is used by the convenience functions <code>new/1</code> and <code>modify/2</code>.
   """
- # @opaque statebox() :: StateBox
-  #@type event() :: {timestamp(), op()}
-  #@deftype timestamp() :: EStateBox.Clock.timestamp()
-  #@type timedelta() :: integer()
-  #@type basic_op() :: {module(), atom(), [term()]} |
-                      ## function type
-                      #{((term(), term()) -> StateBox) |
-                      #((term(), term(), term()) -> StateBox), [term()]}
-  #@type op() :: basic_op() | [op()]
+  @opaque statebox() :: StateBox
+  @type event() :: {timestamp(), op()}
+  @type timestamp() :: EStateBox.Clock.timestamp()
+  @type timedelta() :: integer()
+  @type basic_op() :: {module(), atom(), [term()]} |
+                      # function type
+                      {((term(), term()) -> StateBox) |
+                      ((term(), term(), term()) -> StateBox), [term()]}
+  @type op() :: basic_op() | [op()]
   defmodule StateBox do defstruct [
     value: nil,
     ##  sorted list of operations (oldest first)
@@ -113,7 +113,7 @@ defmodule EStateBox do
   def modify(t, op, %StateBox{value: value, queue: queue, last_modified: oldt}) when oldt <= t do
     new(t, apply_op(op, value), queue_in({t, op}, queue))
   end
-  def modify(t, op, %StateBox{last_modified: oldt}), do: throw({:invalid_timestamp, {t, '<',  oldt}})
+  def modify(t, _op, %StateBox{last_modified: oldt}), do: throw({:invalid_timestamp, {t, '<',  oldt}})
 
   @doc """
   Modify a statebox at timestamp
