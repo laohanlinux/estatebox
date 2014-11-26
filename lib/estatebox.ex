@@ -93,7 +93,6 @@ defmodule EStateBox do
     queue = unordered |>
       Enum.map(fn(%StateBox{queue: q}) -> q end) |>
       :lists.umerge
-    IO.puts "Merge Queue: #{inspect queue}"
     new(t, apply_queue(v, queue), queue)
   end
 
@@ -160,7 +159,6 @@ defmodule EStateBox do
   defp newest(m, []), do: m
   ## Return a new StateBox
   defp new(t, v, q) do
-    IO.puts "value: #{inspect v}"
     %StateBox{value: v, queue: q, last_modified: t}
   end
   ## Push a new into event queue
